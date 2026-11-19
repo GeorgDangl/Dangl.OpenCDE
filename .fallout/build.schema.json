@@ -1,79 +1,5 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
-  "properties": {
-    "BuildElectronUnixTargets": {
-      "type": "boolean"
-    },
-    "BuildElectronWindowsTargets": {
-      "type": "boolean"
-    },
-    "CodeSigningCertificateKeyVaultBaseUrl": {
-      "type": "string"
-    },
-    "CodeSigningCertificateName": {
-      "type": "string"
-    },
-    "CodeSigningKeyVaultTenantId": {
-      "type": "string"
-    },
-    "Configuration": {
-      "type": "string",
-      "description": "Configuration to build - Default is 'Debug' (local) or 'Release' (server)",
-      "enum": [
-        "Debug",
-        "Release"
-      ]
-    },
-    "DanglCiCdSlackWebhookUrl": {
-      "type": "string"
-    },
-    "DanglCiCdTeamsWebhookUrl": {
-      "type": "string"
-    },
-    "DanglInternalNuGetFeedReaderKey": {
-      "type": "string"
-    },
-    "DockerImageName": {
-      "type": "string"
-    },
-    "DockerRegistryPassword": {
-      "type": "string"
-    },
-    "DockerRegistryUrl": {
-      "type": "string"
-    },
-    "DockerRegistryUsername": {
-      "type": "string"
-    },
-    "DocuApiKey": {
-      "type": "string"
-    },
-    "DocuBaseUrl": {
-      "type": "string"
-    },
-    "ExecutablesToSignFolder": {
-      "type": "string"
-    },
-    "GitHubAuthenticationToken": {
-      "type": "string"
-    },
-    "KeyVaultBaseUrl": {
-      "type": "string"
-    },
-    "KeyVaultClientId": {
-      "type": "string"
-    },
-    "KeyVaultClientSecret": {
-      "type": "string"
-    },
-    "KeyVaultTenantId": {
-      "type": "string"
-    },
-    "Solution": {
-      "type": "string",
-      "description": "Path to a solution file that is automatically loaded"
-    }
-  },
   "definitions": {
     "Host": {
       "type": "string",
@@ -119,6 +45,7 @@
         "PushDocker",
         "Restore",
         "SignExecutables",
+        "TestMarkdownDocumentation",
         "UploadDocumentation"
       ]
     },
@@ -129,10 +56,11 @@
         "Verbose",
         "Normal",
         "Minimal",
-        "Quiet"
+        "Quiet",
+        "Information"
       ]
     },
-    "NukeBuild": {
+    "FalloutBuild": {
       "properties": {
         "Continue": {
           "type": "boolean",
@@ -148,7 +76,7 @@
         },
         "NoLogo": {
           "type": "boolean",
-          "description": "Disables displaying the NUKE logo"
+          "description": "Disables displaying the Fallout logo"
         },
         "Partition": {
           "type": "string",
@@ -186,9 +114,96 @@
         "Verbosity": {
           "description": "Logging verbosity during build execution. Default is 'Normal'",
           "$ref": "#/definitions/Verbosity"
+        },
+        "BuildProjectFile": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "description": "Path to the build project (.csproj) relative to the repository root. Defaults to 'build/_build.csproj' when unset. Read by the Fallout global tool's in-tool runner."
         }
       }
     }
   },
-  "$ref": "#/definitions/NukeBuild"
+  "allOf": [
+    {
+      "properties": {
+        "BuildElectronUnixTargets": {
+          "type": "boolean"
+        },
+        "BuildElectronWindowsTargets": {
+          "type": "boolean"
+        },
+        "CodeSigningCertificateKeyVaultBaseUrl": {
+          "type": "string"
+        },
+        "CodeSigningCertificateName": {
+          "type": "string"
+        },
+        "CodeSigningKeyVaultTenantId": {
+          "type": "string"
+        },
+        "Configuration": {
+          "type": "string",
+          "enum": [
+            "Debug",
+            "Release"
+          ],
+          "description": "Configuration to build - Default is 'Debug' (local) or 'Release' (server)"
+        },
+        "DanglCiCdSlackWebhookUrl": {
+          "type": "string"
+        },
+        "DanglCiCdTeamsWebhookUrl": {
+          "type": "string"
+        },
+        "DanglInternalNuGetFeedReaderKey": {
+          "type": "string"
+        },
+        "DockerImageName": {
+          "type": "string"
+        },
+        "DockerRegistryPassword": {
+          "type": "string"
+        },
+        "DockerRegistryUrl": {
+          "type": "string"
+        },
+        "DockerRegistryUsername": {
+          "type": "string"
+        },
+        "DocuApiKey": {
+          "type": "string"
+        },
+        "DocuBaseUrl": {
+          "type": "string"
+        },
+        "ExecutablesToSignFolder": {
+          "type": "string"
+        },
+        "GitHubAuthenticationToken": {
+          "type": "string"
+        },
+        "KeyVaultBaseUrl": {
+          "type": "string"
+        },
+        "KeyVaultClientId": {
+          "type": "string"
+        },
+        "KeyVaultClientSecret": {
+          "type": "string"
+        },
+        "KeyVaultTenantId": {
+          "type": "string"
+        },
+        "Solution": {
+          "type": "string",
+          "description": "Path to a solution file that is automatically loaded"
+        }
+      }
+    },
+    {
+      "$ref": "#/definitions/FalloutBuild"
+    }
+  ]
 }
