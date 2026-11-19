@@ -243,6 +243,9 @@ export const version = {{
             DotNet($"{docFxPath} metadata {DocFxFile}", environmentVariables: environmentVariables);
         });
 
+    Target TestMarkdownDocumentation => _ => _
+        .Executes(() => MarkdownDocumentationTests.Run(OutputDirectory / "markdown-tests"));
+
     Target BuildDocumentation => _ => _
         .DependsOn(Clean)
         .DependsOn(BuildDocFxMetadata)
@@ -256,6 +259,9 @@ export const version = {{
             DotNet($"{docFxPath} {DocFxFile}", environmentVariables: environmentVariables);
 
             (DocsDirectory / "CHANGELOG.md").DeleteFile();
+
+            MarkdownDocumentation.Build(RootDirectory, OutputDirectory / "docs",
+                OutputDirectory / "docs-markdown", requireApi: true);
         });
 
     Target Coverage => _ => _
@@ -506,14 +512,17 @@ export const version = {{
         {
             var changeLog = GetCompleteChangeLog(ChangelogFile);
 
-            WebDocu(s => s
-                .SetDocuBaseUrl(DocuBaseUrl)
-                .SetDocuApiKey(DocuApiKey)
-                .SetMarkdownChangelog(changeLog)
-                .SetSourceDirectory(OutputDirectory / "docs")
-                .SetVersion(GitVersion.NuGetVersion)
-                .SetSkipForVersionConflicts(true)
-            );
+            MarkdownDocumentation.Publish(DocuBaseUrl, DocuApiKey, GitVersion.NuGetVersion,
+                OutputDirectory / "docs-markdown.zip",
+                () => WebDocu(s => s
+                    .SetDocuBaseUrl(DocuBaseUrl)
+                    .SetDocuApiKey(DocuApiKey)
+                    .SetMarkdownChangelog(changeLog)
+                    .SetSourceDirectory(OutputDirectory / "docs")
+                    .SetVersion(GitVersion.NuGetVersion)
+                    .SetSkipForVersionConflicts(false)
+                ),
+                skipForVersionConflicts: true);
         });
 
     Target PublishGitHubRelease => _ => _
