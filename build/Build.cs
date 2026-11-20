@@ -1,51 +1,50 @@
 using System;
 using System.Linq;
-using Nuke.Common;
-using Nuke.Common.CI;
-using Nuke.Common.Execution;
-using Nuke.Common.Git;
-using Nuke.Common.IO;
-using Nuke.Common.ProjectModel;
-using Nuke.Common.Tooling;
-using Nuke.Common.Tools.DotNet;
-using Nuke.Common.Tools.GitVersion;
-using Nuke.Common.Utilities.Collections;
-using static Nuke.Common.EnvironmentInfo;
-using static Nuke.Common.IO.FileSystemTasks;
-using static Nuke.Common.IO.PathConstruction;
-using static Nuke.Common.Tools.DotNet.DotNetTasks;
-using static Nuke.Common.IO.TextTasks;
-using static Nuke.Common.Tools.ReportGenerator.ReportGeneratorTasks;
-using static Nuke.Common.Tools.Docker.DockerTasks;
-using static Nuke.Common.Tools.Npm.NpmTasks;
-using static Nuke.Common.IO.HttpTasks;
-using Nuke.Common.Tools.Npm;
-using Nuke.Common.Tools.Docker;
-using Nuke.Common.Tools.Coverlet;
+using Fallout.Common;
+using Fallout.Common.CI;
+using Fallout.Common.Execution;
+using Fallout.Common.Git;
+using Fallout.Common.IO;
+using Fallout.Common.ProjectModel;
+using Fallout.Common.Tooling;
+using Fallout.Common.Tools.DotNet;
+using Fallout.Common.Tools.GitVersion;
+using Fallout.Common.Utilities.Collections;
+using static Fallout.Common.EnvironmentInfo;
+using static Fallout.Common.IO.PathConstruction;
+using static Fallout.Common.Tools.DotNet.DotNetTasks;
+using static Fallout.Common.IO.TextTasks;
+using static Fallout.Common.Tools.ReportGenerator.ReportGeneratorTasks;
+using static Fallout.Common.Tools.Docker.DockerTasks;
+using static Fallout.Common.Tools.Npm.NpmTasks;
+using static Fallout.Common.IO.HttpTasks;
+using Fallout.Common.Tools.Npm;
+using Fallout.Common.Tools.Docker;
+using Fallout.Common.Tools.Coverlet;
 using System.IO;
-using Nuke.Common.Tools.ReportGenerator;
+using Fallout.Common.Tools.ReportGenerator;
 using System.Xml.Linq;
-using static Nuke.Common.Tools.NSwag.NSwagTasks;
-using Nuke.Common.Tools.NSwag;
-using Nuke.Common.Tools.Teams;
+using static Fallout.Common.Tools.NSwag.NSwagTasks;
+using Fallout.Common.Tools.NSwag;
+using Fallout.Common.Tools.Teams;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
-using Nuke.Common.Tools.Slack;
-using Nuke.Common.Tools.AzureKeyVault;
-using static Nuke.GitHub.GitHubTasks;
-using static Nuke.GitHub.ChangeLogExtensions;
-using static Nuke.Common.ChangeLog.ChangelogTasks;
-using Nuke.GitHub;
+using Fallout.Common.Tools.Slack;
+using Fallout.Common.Tools.AzureKeyVault;
+using static Fallout.GitHub.GitHubTasks;
+using static Fallout.GitHub.ChangeLogExtensions;
+using static Fallout.Common.ChangeLog.ChangelogTasks;
+using Fallout.GitHub;
 using System.IO.Compression;
-using static Nuke.WebDocu.WebDocuTasks;
-using Nuke.WebDocu;
+using static Fallout.WebDocu.WebDocuTasks;
+using Fallout.WebDocu;
 using Newtonsoft.Json;
-using Nuke.Common.Utilities;
+using Fallout.Common.Utilities;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Text;
 
-class Build : NukeBuild
+class Build : FalloutBuild
 {
     public static int Main() => Execute<Build>(x => x.Compile);
 
@@ -101,11 +100,9 @@ class Build : NukeBuild
     [NuGetPackage("AzureSignTool", "tools/net8.0/any/AzureSignTool.dll")]
     readonly Tool AzureSign;
 
-    public Build()
-    {
-        // Otherwise, Angular compiler output is logged to stderr instead of stdout.
-        NpmTasks.NpmLogger = (outputType, message) => Serilog.Log.Debug(message);
-    }
+    // Angular writes normal compiler output to stderr.
+    static void LogNpmOutput(OutputType _, string message) =>
+        Serilog.Log.Debug("{Message}", message);
 
     protected override void OnTargetFailed(string target)
     {
@@ -239,9 +236,12 @@ export const version = {{
         {
             var environmentVariables = EnvironmentInfo.Variables.ToDictionary();
             environmentVariables.Add("DOCFX_SOURCE_BRANCH_NAME", GitVersion.BranchName);
-            var docFxPath = NuGetToolPathResolver.GetPackageExecutable("docfx", "tools/net8.0/any/docfx.dll");
+            var docFxPath = NuGetToolPathResolver.GetPackageExecutable("docfx", "tools/net10.0/any/docfx.dll");
             DotNet($"{docFxPath} metadata {DocFxFile}", environmentVariables: environmentVariables);
         });
+
+    Target TestMarkdownDocumentation => _ => _
+        .Executes(() => MarkdownDocumentationTests.Run(OutputDirectory / "markdown-tests"));
 
     Target BuildDocumentation => _ => _
         .DependsOn(Clean)
@@ -252,10 +252,12 @@ export const version = {{
 
             var environmentVariables = EnvironmentInfo.Variables.ToDictionary();
             environmentVariables.Add("DOCFX_SOURCE_BRANCH_NAME", GitVersion.BranchName);
-            var docFxPath = NuGetToolPathResolver.GetPackageExecutable("docfx", "tools/net8.0/any/docfx.dll");
+            var docFxPath = NuGetToolPathResolver.GetPackageExecutable("docfx", "tools/net10.0/any/docfx.dll");
             DotNet($"{docFxPath} {DocFxFile}", environmentVariables: environmentVariables);
+            MarkdownDocumentation.Create(DocFxFile, OutputDirectory / "docs-markdown");
 
             (DocsDirectory / "CHANGELOG.md").DeleteFile();
+
         });
 
     Target Coverage => _ => _
@@ -277,10 +279,9 @@ export const version = {{
                     .EnableNoBuild()
                     .SetTestAdapterPath(".")
                     .AddProcessEnvironmentVariable("DANGL_OPENCDE_IGNORE_SQLSERVER_PARALLEL_LIMIT", "true")
-                    .SetProcessArgumentConfigurator(a => a
-                        .Add($"/p:Include=[Dangl.OpenCDE.*]*")
-                        .Add($"/p:ExcludeByFile=\"{SourceDirectory / "Dangl.OpenCDE" / "Migrations"}*.cs\"")
-                        .Add($"/p:Exclude=[Dangl.OpenCDE.TestUtilities]*"))
+                    .AddProcessAdditionalArguments($"/p:Include=[Dangl.OpenCDE.*]*")
+                        .AddProcessAdditionalArguments($"/p:ExcludeByFile=\"{SourceDirectory / "Dangl.OpenCDE" / "Migrations"}*.cs\"")
+                        .AddProcessAdditionalArguments($"/p:Exclude=[Dangl.OpenCDE.TestUtilities]*")
                     .CombineWith(cc => testProjects
                         .Select(testProject =>
                         {
@@ -339,7 +340,7 @@ export const version = {{
         NSwagExecuteDocument(x => x
                 .SetProcessWorkingDirectory(SourceDirectory / "server" / "Dangl.OpenCDE")
                 .SetProcessEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development")
-                .SetNSwagRuntime("Net70")
+                .SetProcessToolPath(NuGetToolPathResolver.GetPackageExecutable("NSwag.MSBuild", "tools/Net80/dotnet-nswag.dll"))
                 .SetInput(nSwagConfigPath));
 
         nSwagConfigPath = SourceDirectory / "client" / "Dangl.OpenCDE.Client" / "nswag.json";
@@ -347,7 +348,7 @@ export const version = {{
         NSwagExecuteDocument(x => x
                 .SetProcessWorkingDirectory(SourceDirectory / "client" / "Dangl.OpenCDE.Client")
                 .SetProcessEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development")
-                .SetNSwagRuntime("Net70")
+                .SetProcessToolPath(NuGetToolPathResolver.GetPackageExecutable("NSwag.MSBuild", "tools/Net80/dotnet-nswag.dll"))
                 .SetInput(nSwagConfigPath));
 
         nSwagConfigPath = SourceDirectory / "client" / "Dangl.OpenCDE.Client" / "nswag-opencde.nswag";
@@ -355,7 +356,7 @@ export const version = {{
         NSwagExecuteDocument(x => x
                 .SetProcessWorkingDirectory(SourceDirectory / "client" / "Dangl.OpenCDE.Client")
                 .SetProcessEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development")
-                .SetNSwagRuntime("Net70")
+                .SetProcessToolPath(NuGetToolPathResolver.GetPackageExecutable("NSwag.MSBuild", "tools/Net80/dotnet-nswag.dll"))
                 .SetInput(nSwagConfigPath));
     });
 
@@ -365,7 +366,7 @@ export const version = {{
         {
             (SourceDirectory / "server" / "dangl-opencde-ui" / "node_modules").CreateOrCleanDirectory();
             (SourceDirectory / "server" / "dangl-opencde-ui" / "node_modules").DeleteDirectory();
-            Npm("ci", SourceDirectory / "server" / "dangl-opencde-ui");
+            Npm("ci", SourceDirectory / "server" / "dangl-opencde-ui", logger: LogNpmOutput);
         });
 
     Target BuildFrontend => _ => _
@@ -374,7 +375,7 @@ export const version = {{
         .Executes(() =>
         {
             (SourceDirectory / "server" / "Dangl.OpenCDE" / "wwwroot" / "dist").CreateOrCleanDirectory();
-            NpmRun(x => x
+            NpmRun(x => x.SetProcessLogger(LogNpmOutput)
                 .SetProcessWorkingDirectory(SourceDirectory / "server" / "dangl-opencde-ui")
                 .SetCommand("build:production"));
 
@@ -510,6 +511,7 @@ export const version = {{
                 .SetDocuBaseUrl(DocuBaseUrl)
                 .SetDocuApiKey(DocuApiKey)
                 .SetMarkdownChangelog(changeLog)
+                .SetMarkdownPackagePath(OutputDirectory / "docs-markdown.zip")
                 .SetSourceDirectory(OutputDirectory / "docs")
                 .SetVersion(GitVersion.NuGetVersion)
                 .SetSkipForVersionConflicts(true)
@@ -546,8 +548,8 @@ export const version = {{
         .Executes(() =>
         {
             var frontendDirectory = SourceDirectory / "client" / "dangl-opencde-client-ui";
-            NpmCi(c => c.SetProcessWorkingDirectory(frontendDirectory));
-            NpmRun(c => c
+            NpmCi(c => c.SetProcessLogger(LogNpmOutput).SetProcessWorkingDirectory(frontendDirectory));
+            NpmRun(c => c.SetProcessLogger(LogNpmOutput)
                 .SetCommand("build:production")
                 .SetProcessWorkingDirectory(frontendDirectory));
         });
@@ -629,18 +631,7 @@ export const version = {{
 
         try
         {
-            var azureSignArguments = new Arguments()
-                .Add("sign")
-                .Add("--azure-key-vault-url {0}", CodeSigningCertificateKeyVaultBaseUrl)
-                .Add("--azure-key-vault-client-id {0}", KeyVaultClientId)
-                .Add("--azure-key-vault-client-secret {0}", KeyVaultClientSecret)
-                .Add("--azure-key-vault-tenant-id {0}", CodeSigningKeyVaultTenantId)
-                .Add("--azure-key-vault-certificate {0}", CodeSigningCertificateName)
-                .Add("--input-file-list {0}", filesListPath)
-                .Add("--timestamp-rfc3161 {0}", "http://timestamp.digicert.com")
-                .ToString();
-
-            AzureSign(azureSignArguments);
+            AzureSign($"sign --azure-key-vault-url {CodeSigningCertificateKeyVaultBaseUrl} --azure-key-vault-client-id {KeyVaultClientId} --azure-key-vault-client-secret \"{KeyVaultClientSecret:r}\" --azure-key-vault-tenant-id {CodeSigningKeyVaultTenantId} --azure-key-vault-certificate {CodeSigningCertificateName} --input-file-list {filesListPath} --timestamp-rfc3161 http://timestamp.digicert.com");
         }
         finally
         {
@@ -667,7 +658,7 @@ export const version = {{
         }
         else
         {
-            // NUKE somehow fails to locate 'electronize' via '/usr/bin/which', however, after installation,
+            // The build tool sometimes fails to locate 'electronize' via '/usr/bin/which', however, after installation,
             // we can find the location of the .NET global tool
             var electronizePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".dotnet", "tools", "electronize");
             Assert.True(File.Exists(electronizePath), "File does not exist: " + electronizePath);
